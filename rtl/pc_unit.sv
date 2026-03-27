@@ -18,7 +18,7 @@ always_ff @(posedge clk or negedge resetn) begin
 	else begin
 		if(pc_write) begin
 			if(branch_detect)	pc_if <= adder_branch;
-			else				pc_if <= adder_four;
+			else			pc_if <= adder_four;
 		end			
 	end
 end

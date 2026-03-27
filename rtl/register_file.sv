@@ -17,7 +17,7 @@ end
 
 always_ff @(posedge clk or negedge resetn) begin
 	if(!resetn) begin
-		for(int i=0;i<XPRLEN-1;i++)	x[i] <= '0;
+		for(int i=0;i<XPRLEN;i++)	x[i] <= '0;
 	end
 	else begin
 		if(reg_write)	begin

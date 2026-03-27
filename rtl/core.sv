@@ -2,8 +2,11 @@
 module core #(
 	parameter int XPRLEN = 32
 )(
-	input  logic clk, resetn, 
-	output logic done
+	input	logic	clk, resetn,
+	risc_if.cache_modport icache_port,
+	risc_if.cache_modport dcache_port,
+	output	logic done,
+	output	logic [XPRLEN-1:0] count_inst, count_cycle
 );
 
 /////////////////////////[IFID]///////////////////////
@@ -11,67 +14,79 @@ logic 		 [XPRLEN-1:0] ifid_pc, 		Q_ifid_pc;
 logic 		 [XPRLEN-1:0] ifid_instr, 	Q_ifid_instr;
 
 ///////////////////////[IDEX]///////////////////////	
-logic 		 [XPRLEN-1:0] idex_pc, 			Q_idex_pc;		
-logic 		 [XPRLEN-1:0] idex_data1, 		Q_idex_data1;	
-logic 		 [XPRLEN-1:0] idex_data2, 		Q_idex_data2;	
-logic 		 [XPRLEN-1:0] idex_immediate, 		Q_idex_immediate;
+logic 		 [XPRLEN-1:0]	idex_pc, 		Q_idex_pc;		
+logic 		 [XPRLEN-1:0]	idex_data1, 		Q_idex_data1;	
+logic 		 [XPRLEN-1:0]	idex_data2, 		Q_idex_data2;	
+logic 		 [XPRLEN-1:0]	idex_immediate, 	Q_idex_immediate;
 logic 		 [3:0]		idex_funct, 		Q_idex_funct;
 logic 		 [4:0]          idex_rd, 		Q_idex_rd; 
 logic		 [4:0]		idex_rs1, 		Q_idex_rs1; 
 logic		 [4:0]          idex_rs2, 		Q_idex_rs2;
-logic					  idex_mem_read,	Q_idex_mem_read;
-logic					  idex_mem_write,	Q_idex_mem_write;
-logic					  idex_mem_to_reg,  	Q_idex_mem_to_reg;
-logic					  idex_reg_write,	Q_idex_reg_write;
-logic		 [1:0]		  	  idex_aluop, 		Q_idex_aluop;
-logic		 [1:0]			  idex_alusrc,		Q_idex_alusrc;
+logic				idex_mem_read,		Q_idex_mem_read;
+logic				idex_mem_write,		Q_idex_mem_write;
+logic				idex_mem_to_reg,  	Q_idex_mem_to_reg;
+logic				idex_reg_write,		Q_idex_reg_write;
+logic		 [1:0]		idex_aluop, 		Q_idex_aluop;
+logic		 [1:0]		idex_alusrc,		Q_idex_alusrc;
 
-logic		 [XPRLEN-1:0] Q_idex_instr;
+logic		 [XPRLEN-1:0]	Q_idex_instr;
 
 //////////////////////////[EXMEM]///////////////////////
-logic 		 [XPRLEN-1:0] exmem_alu_result, 	Q_exmem_alu_result;
-logic 		 [XPRLEN-1:0] exmem_data2, 			Q_exmem_data2;
-logic 		 [4:0]	 	  exmem_rd, 			Q_exmem_rd; 
-logic		 			  exmem_mem_read, 		Q_exmem_mem_read;
-logic					  exmem_mem_write, 		Q_exmem_mem_write;
-logic 		 			  exmem_reg_write, 		Q_exmem_reg_write;
-logic					  exmem_mem_to_reg, 	Q_exmem_mem_to_reg;
+logic 		 [XPRLEN-1:0]	exmem_alu_result, 	Q_exmem_alu_result;
+logic 		 [XPRLEN-1:0]	exmem_data2, 		Q_exmem_data2;
+logic 		 [4:0]		exmem_rd, 		Q_exmem_rd; 
+logic		 		exmem_mem_read, 	Q_exmem_mem_read;
+logic				exmem_mem_write, 	Q_exmem_mem_write;
+logic 		 		exmem_reg_write, 	Q_exmem_reg_write;
+logic				exmem_mem_to_reg, 	Q_exmem_mem_to_reg;
 
-logic		[XPRLEN-1:0] Q_exmem_instr;
+logic		[XPRLEN-1:0]	Q_exmem_instr;
 //////////////////////////[MEMWB]///////////////////////
-logic 		 [XPRLEN-1:0] memwb_mem_data, 		Q_memwb_mem_data;
-logic 		 [XPRLEN-1:0] memwb_alu_result, 	Q_memwb_alu_result;
-logic 		 [4:0]	 	  memwb_rd, 			Q_memwb_rd;
-logic		 			  memwb_reg_write, 		Q_memwb_reg_write;
-logic					  memwb_mem_to_reg, 	Q_memwb_mem_to_reg;
+logic 		 [XPRLEN-1:0]	memwb_mem_data, 	Q_memwb_mem_data;
+logic 		 [XPRLEN-1:0]	memwb_alu_result, 	Q_memwb_alu_result;
+logic 		 [4:0]		memwb_rd, 		Q_memwb_rd;
+logic		 		memwb_reg_write, 	Q_memwb_reg_write;
+logic				memwb_mem_to_reg, 	Q_memwb_mem_to_reg;
 
-logic		[XPRLEN-1:0] Q_memwb_instr;
+logic		[XPRLEN-1:0]	Q_memwb_instr;
 //	hazard detection signals
-logic					  sig_write_enable;
-logic					  sig_id_flush;
-logic					  sig_pc_write;
+logic	sig_write_enable;
+logic	sig_id_flush;
+logic	sig_pc_write;
 
 // branch unit signals
-logic			  	      sig_branch_detect;
+logic	sig_branch_detect;
 
 // control unit signals
-logic		 [6:0]		  sig_ctrl_opcode;
-logic					  sig_ctrl_branch, sig_ctrl_mem_read;
-logic					  sig_ctrl_mem_to_reg, sig_ctrl_mem_write;
-logic		 [1:0]		  sig_ctrl_aluop, sig_ctrl_alusrc;
-logic					  sig_ctrl_reg_write;
+logic	[6:0]	sig_ctrl_opcode;
+logic		sig_ctrl_branch, sig_ctrl_mem_read;
+logic		sig_ctrl_mem_to_reg, sig_ctrl_mem_write;
+logic	[1:0]	sig_ctrl_aluop, sig_ctrl_alusrc;
+logic		sig_ctrl_reg_write;
 
 // mux select lines
-logic		 [1:0]		  sig_branch_selA, sig_branch_selB;
-logic		 [1:0] 		  sig_forward_selA, sig_forward_selB;
+logic	[1:0]	sig_branch_selA, sig_branch_selB;
+logic	[1:0] 	sig_forward_selA, sig_forward_selB;
 
 // alu control out signal
-logic	     [2:0]		 sig_alu_ctrl_out;
+logic	[2:0]	sig_alu_ctrl_out;
 
 logic signed [XPRLEN-1:0] sig_rf_out1, sig_rf_out2;
 logic signed [XPRLEN-1:0] sig_alu_in1, sig_alu_in2;
-
 logic signed [XPRLEN-1:0] sig_reg_data_in;
+
+logic i_cpu_stall, d_cpu_stall;
+
+always_ff @(posedge clk or negedge resetn) begin
+	if(!resetn) begin
+		count_inst  	<= 0;
+		count_cycle 	<= 0;
+	end
+	else begin
+		count_cycle <= count_cycle + 1;
+		if((Q_memwb_instr != '1)&&(Q_memwb_instr != '0))		count_inst <= count_inst + 1;
+	end
+end
 
 pc_unit inst_pc_unit (
 	.clk(clk),
@@ -83,10 +98,23 @@ pc_unit inst_pc_unit (
 	.pc_if(ifid_pc)
 );
 
-instr_mem inst_instr_mem (
-	.clk(clk),
+instruction_cache inst_icache (
+	.clk(icache_port.clk),
+	.ARESETn(icache_port.resetn),
+	.ARVALID(icache_port.ARVALID),
+	.ARREADY(icache_port.ARREADY),
+	.ARADDR(icache_port.ARADDR),
+	.ARLEN(icache_port.ARLEN),
+	.ARSIZE(icache_port.ARSIZE),
+	.ARBURST(icache_port.ARBURST),
+	.RVALID(icache_port.RVALID),
+	.RREADY(icache_port.RREADY),
+	.RDATA(icache_port.RDATA),
+	.RRESP(icache_port.RRESP),
+	.RLAST(icache_port.RLAST),
 	.address(ifid_pc),
-	.instr(ifid_instr)
+	.instr(ifid_instr),
+	.pipeline_stall(i_cpu_stall)
 );
 
 instr_parser inst_instr_parser (
@@ -109,7 +137,7 @@ control_unit inst_control_unit (
 
 always_comb begin
 	if(sig_id_flush) begin
-		idex_aluop 		= 0;
+		idex_aluop 	= 0;
 		idex_mem_read 	= 0;
 		idex_alusrc 	= 0;
 		idex_mem_write  = 0;
@@ -117,7 +145,7 @@ always_comb begin
 		idex_reg_write 	= 0;
 	end
 	else begin
-		idex_aluop 		= sig_ctrl_aluop;
+		idex_aluop 	= sig_ctrl_aluop;
 		idex_mem_read 	= sig_ctrl_mem_read;
 		idex_alusrc 	= sig_ctrl_alusrc;
 		idex_mem_write 	= sig_ctrl_mem_write;
@@ -158,7 +186,8 @@ branch_forwarding_unit inst_branch_forwarding_unit (
 hazard_detect_unit inst_hazard_detection_unit (
 	.opcode(sig_ctrl_opcode),
 	.mem_read_ex(Q_idex_mem_read), .rd_ex(Q_idex_rd), .rs1_id(idex_rs1), .rs2_id(idex_rs2),
-	.id_flush(sig_id_flush), .pc_write(sig_pc_write), .write_enable(sig_write_enable)
+	.id_flush(sig_id_flush), .pc_write(sig_pc_write), .write_enable(sig_write_enable),
+	.i_cpu_stall(i_cpu_stall), .d_cpu_stall(d_cpu_stall), .branch_taken(sig_branch_detect)
 );
 
 assign sig_reg_data_in = (Q_memwb_mem_to_reg) ? Q_memwb_mem_data : Q_memwb_alu_result;
@@ -215,13 +244,26 @@ alu inst_alu (
 	.alu_ctrl(sig_alu_ctrl_out), .alu_result(exmem_alu_result)
 );
 
-data_memory inst_data_memory (
-	.clk(clk),
+data_cache inst_dcache (
+	.clk(dcache_port.clk),
+	.ARESETn(dcache_port.resetn),
+	.ARVALID(dcache_port.ARVALID),
+	.ARREADY(dcache_port.ARREADY),
+	.ARADDR(dcache_port.ARADDR),
+	.ARLEN(dcache_port.ARLEN),
+	.ARSIZE(dcache_port.ARSIZE),
+	.ARBURST(dcache_port.ARBURST),
+	.RVALID(dcache_port.RVALID),
+	.RREADY(dcache_port.RREADY),
+	.RDATA(dcache_port.RDATA),
+	.RRESP(dcache_port.RRESP),
+	.RLAST(dcache_port.RLAST),
 	.mem_read(Q_exmem_mem_read),
 	.mem_write(Q_exmem_mem_write),
 	.address(Q_exmem_alu_result),
 	.data_in(Q_exmem_data2),
-	.data_out(memwb_mem_data)
+	.data_out(memwb_mem_data),
+	.pipeline_stall(d_cpu_stall)
 );
 
 always_comb begin
@@ -230,7 +272,7 @@ always_comb begin
 	exmem_mem_write		= Q_idex_mem_write;
 	exmem_mem_to_reg	= Q_idex_mem_to_reg;
 	exmem_reg_write		= Q_idex_reg_write;
-	exmem_rd   			= Q_idex_rd;         
+	exmem_rd   		= Q_idex_rd;         
 	exmem_data2             = Q_idex_data2;	
 	memwb_reg_write		= Q_exmem_reg_write;
 	memwb_alu_result	= Q_exmem_alu_result;
@@ -242,45 +284,51 @@ always_ff @(posedge clk or negedge resetn) begin
 	if(!resetn) begin
 		done <= 0;
 
-		Q_ifid_pc 			<= '0;
+		
+		Q_ifid_pc 		<= '0;
 		Q_ifid_instr		<= '0;
 
-		Q_idex_pc			<= '0;
+		Q_idex_pc		<= '0;
 		Q_idex_data1		<= '0;
 		Q_idex_data2		<= '0;
 		Q_idex_immediate	<= '0;
 		Q_idex_funct		<= '0;
-		Q_idex_rd			<= '0;
-	    Q_idex_rs1			<= '0;
-	    Q_idex_rs2			<= '0;
-		Q_idex_mem_read     <= '0;
+		Q_idex_rd		<= '0;
+	    	Q_idex_rs1		<= '0;
+	    	Q_idex_rs2		<= '0;
+		Q_idex_mem_read		<= '0;
 		Q_idex_mem_write	<= '0;
 		Q_idex_mem_to_reg	<= '0;
-		Q_idex_reg_write    <= '0;
+		Q_idex_reg_write	<= '0;
 		Q_idex_aluop		<= '0;
 		Q_idex_alusrc		<= '0;
-		Q_idex_instr	<= '0;
+		Q_idex_instr		<= '0;
 		
 		Q_exmem_alu_result	<= '0;
 		Q_exmem_data2		<= '0;
-		Q_exmem_rd			<= '0;
+		Q_exmem_rd		<= '0;
 		Q_exmem_mem_read 	<= '0;
 		Q_exmem_mem_write	<= '0;
 		Q_exmem_reg_write 	<= '0;
 		Q_exmem_mem_to_reg	<= '0;
-		Q_exmem_instr <= '0;
+		Q_exmem_instr 		<= '0;
 
 		Q_memwb_reg_write	<= '0;
 		Q_memwb_mem_data	<= '0;
 		Q_memwb_alu_result	<= '0;
-		Q_memwb_rd 			<= '0;
+		Q_memwb_rd 		<= '0;
 		Q_memwb_mem_to_reg	<= '0;
-		Q_memwb_instr <= '0;
+		Q_memwb_instr 		<= '0;
 	end
 	else begin
 		if(Q_memwb_instr == 32'hFFFF_FFFF)	done <= 1;
 		else					done <= 0;
-		if(sig_branch_detect) begin
+		
+		if(d_cpu_stall)	begin
+			Q_ifid_pc 	<= Q_ifid_pc;
+			Q_ifid_instr	<= Q_ifid_instr;
+		end
+		else if(sig_branch_detect || i_cpu_stall) begin
 			Q_ifid_pc <= '0;
 			Q_ifid_instr <= '0;
 		end
@@ -288,37 +336,48 @@ always_ff @(posedge clk or negedge resetn) begin
 			Q_ifid_pc 	<= ifid_pc;
 			Q_ifid_instr	<= ifid_instr;
 		end
-		Q_idex_pc			<= idex_pc;
-		Q_idex_data1		<= idex_data1;
-		Q_idex_data2		<= idex_data2;
-		Q_idex_immediate	<= idex_immediate;
-		Q_idex_funct		<= idex_funct;
-		Q_idex_rd			<= idex_rd;
-	    	Q_idex_rs1			<= idex_rs1;
-	    	Q_idex_rs2			<= idex_rs2;
-		Q_idex_mem_read     <= idex_mem_read;
-		Q_idex_mem_write	<= idex_mem_write;
-		Q_idex_mem_to_reg	<= idex_mem_to_reg;
-		Q_idex_reg_write    <= idex_reg_write;
-		Q_idex_aluop		<= idex_aluop;
-		Q_idex_alusrc		<= idex_alusrc;
-		Q_idex_instr		<= Q_ifid_instr;
+		if(!d_cpu_stall)	begin
+			Q_idex_pc		<= idex_pc;
+			Q_idex_data1		<= idex_data1;
+			Q_idex_data2		<= idex_data2;
+			Q_idex_immediate	<= idex_immediate;
+			Q_idex_funct		<= idex_funct;
+			Q_idex_rd		<= idex_rd;
+	    		Q_idex_rs1		<= idex_rs1;
+	    		Q_idex_rs2		<= idex_rs2;
+			Q_idex_mem_read		<= idex_mem_read;
+			Q_idex_mem_write	<= idex_mem_write;
+			Q_idex_mem_to_reg	<= idex_mem_to_reg;
+			Q_idex_reg_write	<= idex_reg_write;
+			Q_idex_aluop		<= idex_aluop;
+			Q_idex_alusrc		<= idex_alusrc;
+			Q_idex_instr		<= Q_ifid_instr;
 
-		Q_exmem_alu_result	<= exmem_alu_result;
-		Q_exmem_data2		<= exmem_data2;
-		Q_exmem_rd			<= exmem_rd;
-		Q_exmem_mem_read 	<= exmem_mem_read;
-		Q_exmem_mem_write	<= exmem_mem_write;
-		Q_exmem_reg_write 	<= exmem_reg_write;
-		Q_exmem_mem_to_reg	<= exmem_mem_to_reg;
-		Q_exmem_instr	<= Q_idex_instr;
-
-		Q_memwb_mem_data	<= memwb_mem_data;
-		Q_memwb_alu_result	<= memwb_alu_result;
-		Q_memwb_rd 			<= memwb_rd;
-		Q_memwb_mem_to_reg	<= memwb_mem_to_reg;
-		Q_memwb_reg_write	<= memwb_reg_write;
-		Q_memwb_instr	<= Q_exmem_instr;
+			Q_exmem_alu_result	<= exmem_alu_result;
+			Q_exmem_data2		<= exmem_data2;
+			Q_exmem_rd		<= exmem_rd;
+			Q_exmem_mem_read 	<= exmem_mem_read;
+			Q_exmem_mem_write	<= exmem_mem_write;
+			Q_exmem_reg_write 	<= exmem_reg_write;
+			Q_exmem_mem_to_reg	<= exmem_mem_to_reg;
+			Q_exmem_instr		<= Q_idex_instr;
+		end
+		if(d_cpu_stall) begin
+			Q_memwb_mem_data	<= '0;
+			Q_memwb_alu_result	<= '0;
+			Q_memwb_rd 		<= '0;
+			Q_memwb_mem_to_reg	<= '0;
+			Q_memwb_reg_write	<= '0;
+			Q_memwb_instr		<= '0;
+		end 
+		else begin
+			Q_memwb_mem_data	<= memwb_mem_data;
+			Q_memwb_alu_result	<= memwb_alu_result;
+			Q_memwb_rd 		<= memwb_rd;
+			Q_memwb_mem_to_reg	<= memwb_mem_to_reg;
+			Q_memwb_reg_write	<= memwb_reg_write;
+			Q_memwb_instr		<= Q_exmem_instr;
+		end
 	end
 end
 
