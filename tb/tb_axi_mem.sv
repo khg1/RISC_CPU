@@ -21,9 +21,11 @@ module tb_axi_mem;
 
     logic clk, resetn;
     
-    risc_if axi_bus(.clk(clk), .resetn(resetn));
+    axi_if axi_bus();
     
     axi_mem DUT (
+	.clk(clk),
+	.resetn(resetn),
         .axi_port(axi_bus.sub_modport)
     );
     
