@@ -26,7 +26,7 @@ module tb_axi_mem;
     axi_mem DUT (
 	.clk(clk),
 	.resetn(resetn),
-        .axi_port(axi_bus.sub_modport)
+        .axi_port(axi_bus.AXI_SLAVE)
     );
     
     initial begin
@@ -48,7 +48,7 @@ module tb_axi_mem;
         
         for (int i = 0; i < 10; i++) begin
             pkt = new();
-            if(!pkt.randomize())	$fatal("randomization failed!");
+            if(!pkt.randomize())	$fatal(1,"randomization failed!");
             $display("test %0d: len = %0d, address = 0x%0h", i, pkt.burst_length, pkt.start_addr);
             write_burst(pkt);
             read_and_verify(pkt);
@@ -120,7 +120,7 @@ module tb_axi_mem;
 	    end while(!axi_bus.RVALID);
             read_data = axi_bus.RDATA;
             if (read_data != p.data_payload[i]) begin
-                $fatal("data mismatch at index %0d, Expected: 0x%0h, Got: 0x%0h", i, p.data_payload[i], read_data);
+                $fatal(1,"data mismatch at index %0d, Expected: 0x%0h, Got: 0x%0h", i, p.data_payload[i], read_data);
             end
 	    if(i == p.burst_length)	break;
         end
