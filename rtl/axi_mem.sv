@@ -3,7 +3,7 @@ module axi_mem #(
  	parameter int	DEPTH   = 1024
 )(
 	input clk, resetn,
-	axi_if.sub_modport axi_port
+	axi_if.AXI_SLAVE axi_port
 );
 
 typedef enum logic [1:0]	{SR_IDLE=2'b00, SR_ADDR=2'b01, SR_DATA=2'b10} axiread_state_t;
