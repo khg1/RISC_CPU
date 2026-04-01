@@ -1,117 +1,115 @@
-`include "risc_pkg.sv"
 module instruction_cache #(
-	parameter int XPRLEN = 32,
-	parameter int DEPTH = 500,
 	parameter int ADDR_WIDTH = 32,
 	parameter int DATA_WIDTH = 32,
-	parameter int RRESP_WIDTH = 4 
+	parameter int RESP_WIDTH = 2
 )(
-	input	logic			clk,
-	input	logic	[XPRLEN-1:0]	address,
-	output	logic	[XPRLEN-1:0]	instr,
-	output	logic			pipeline_stall,
-	
-	input	logic				ARESETn,
-	output  logic                           ARVALID,
-        input   logic                           ARREADY,
-        output  logic [ADDR_WIDTH-1:0]          ARADDR,
-        output  logic [7:0]                     ARLEN,
-        output  logic [2:0]                     ARSIZE,
-        output  logic [1:0]                     ARBURST,
-
-        input   logic                           RVALID,
-        output  logic                           RREADY,
-        input   logic [DATA_WIDTH-1:0]          RDATA,
-        input   logic [RRESP_WIDTH-1:0]         RRESP,
-        input   logic                           RLAST
+	input	logic				clk,
+	input	logic				resetn,
+	input	logic	[ADDR_WIDTH-1:0]	address,
+	output	logic	[DATA_WIDTH-1:0]	data,
+	output	logic				stall_pipeline,
+	axi_if.AXI_MASTER_READ			axi_port
 );
 
-import risc_pkg::*;
+typedef struct packed {
+	logic				valid;
+	logic	[25:0]			tag;
+	logic	[0:3][DATA_WIDTH-1:0]	storage;
+} icache_block_t;
 
-logic	[XPRLEN-1:0]	imem	[0:DEPTH-1];
-logic			valid	[0:DEPTH-1];		
-logic	[7:0]		burst_read_index;
-logic   [RRESP_WIDTH-1:0] read_response;
-logic	[XPRLEN-1:0]	missed_address;
+typedef enum logic [1:0] {I_REQ, I_HANDLE, I_IDLE} icache_state_t;
 
-read_state_t read_current_state, read_next_state;
+icache_block_t [0:3] instruction_cache;
+icache_state_t icache_current_state, icache_next_state;
 
-always_ff @(posedge clk or negedge ARESETn) begin
-        if(!ARESETn) begin
-                read_current_state      <= R_IDLE;
-        end
-        else begin
-                read_current_state      <= read_next_state;
-	end
-end
+logic [1:0] cache_index, word_offset, byte_offset;
+
+
+logic	[ADDR_WIDTH-1:0]	missed_address;
+logic	[1:0]			written_word_offset;
+logic   [RESP_WIDTH-1:0]	read_response;
+logic				hit;
+
+assign stall_pipeline = ~hit;
+assign cache_index = address[5:4];
+assign word_offset = address[3:2];
+assign byte_offset = address[1:0];
 
 always_comb begin
-	if(read_current_state == R_IDLE)	begin
-		if((address[1:0] == 2'b00) && (valid[address>>2] == 1))	begin
-			instr = imem[address>>2];
-			pipeline_stall = 0;
+	hit = 0;
+	data = '0;
+	if((instruction_cache[cache_index].tag == address[31:6])&&instruction_cache[cache_index].valid) begin
+		data = instruction_cache[cache_index].storage[word_offset];
+		hit = 1;
+	end
+	else	hit = 0;
+end
+
+always_ff @(posedge clk or negedge resetn) begin
+	if(!resetn) begin
+		icache_current_state <= I_IDLE;
+		for(int i = 0; i < 4; i++) begin
+			instruction_cache[i].valid <= 0;
 		end
-		else 	pipeline_stall = 1;
 	end
-	else	pipeline_stall = 1;
+	else	icache_current_state <= icache_next_state;
 end
 
 always_comb begin
-        case (read_current_state)
-                R_ADDR: read_next_state = (ARREADY & ARVALID)   ? R_DATA:R_ADDR;
-                R_DATA: read_next_state = (RLAST)     ? R_IDLE:R_DATA;
-                R_IDLE: read_next_state = pipeline_stall        ? R_ADDR:R_IDLE;
+	case (icache_current_state)
+		I_REQ:			icache_next_state = (axi_port.ARREADY & axi_port.ARVALID) ? I_HANDLE:I_REQ;
+		I_HANDLE:		icache_next_state = (axi_port.RLAST & axi_port.RVALID) ? I_IDLE:I_HANDLE;
+		I_IDLE:			icache_next_state = (!hit) ? I_REQ:I_IDLE;
+		default:		icache_next_state = I_IDLE;
 	endcase
 end
 
-always_ff @(posedge clk or negedge ARESETn) begin
-	if(!ARESETn) begin
-                ARVALID         <= 0;
-                ARADDR          <= '0;
-                ARLEN           <= '0;
-                ARSIZE          <= '0;
-                ARBURST         <= '0;
-                RREADY          <= '0;
-                burst_read_index <= '0;
-		missed_address	<= '0;
-		for(int i=0; i<(DEPTH-1); i++)	begin
-			imem[i] <= '0;
-			valid[i] <= 0;
-		end
+always_ff @(posedge clk or negedge resetn) begin
+	if(!resetn) begin
+		missed_address <= '0;
+		written_word_offset <= '0;
+		axi_port.ARVALID <= 0;
+		axi_port.ARADDR	<= '0;
+		axi_port.ARLEN	<= '0;
+		axi_port.ARSIZE	<= '0;
+		axi_port.ARBURST <= '0;
+		axi_port.RREADY	<= 0;
 	end
 	else begin
-		case (read_current_state)
-	        	R_ADDR: begin
-	        	        if(ARREADY & ARVALID) begin
-	        	                ARVALID <= 0;
-	        	                RREADY  <= 1;
-	        	        end
-	        	end
-	        	R_DATA: begin
-	        	        if(RREADY & RVALID) begin
-	        	                imem[(missed_address[XPRLEN-1:2])+burst_read_index] <= RDATA;
-	        	                valid[(missed_address[XPRLEN-1:2])+burst_read_index] <= 1;
-	        	                burst_read_index <= burst_read_index + 1;
-	        	                read_response <= RRESP;
-	        	                if(RLAST) begin
-	        	                        RREADY <= 0;
-	        	                        burst_read_index <= 0;
-	        	                end
-	        	        end
-	        	end
-	        	R_IDLE: begin
-	        	        if(pipeline_stall) begin
+		case (icache_current_state)
+			I_REQ:	begin
+				if(axi_port.ARREADY & axi_port.ARVALID) begin
+					axi_port.ARVALID <= 0;
+					axi_port.RREADY	<= 1;
+				end
+			end
+			I_HANDLE: begin
+				if(axi_port.RREADY & axi_port.RVALID) begin
+					instruction_cache[missed_address[5:4]].storage[written_word_offset] <= axi_port.RDATA;
+					written_word_offset <= written_word_offset + 1;
+					read_response <= axi_port.RRESP;
+					
+					if(axi_port.RLAST) begin
+						instruction_cache[missed_address[5:4]].valid <= 1;
+						instruction_cache[missed_address[5:4]].tag <= missed_address[31:6];
+						axi_port.RREADY <= 0;
+						written_word_offset <= 0;
+					end
+				end
+			end
+			I_IDLE: begin
+				if(!hit) begin
 					missed_address <= address;
-	        	                ARVALID <= 1;
-	        	                ARADDR  <= address;
-	        	                ARLEN   <= 8'h0a;       //ARLEN+1 transfers per transactions
-	        	                //ARLEN <= '0;
-					ARSIZE  <= 3'h2;        // 4 bytes per transfer
-	        	        end
-	        	end
+					axi_port.ARVALID <= 1;
+					axi_port.ARADDR  <= {address[31:4], 4'h0};
+					axi_port.ARLEN	<= 8'h03;	//4 words per block
+					axi_port.ARSIZE	<= 3'h2;	// 4 bytes per word
+					axi_port.ARBURST	<= 2'h1;
+					instruction_cache[address[5:4]].valid <= 0;
+				end
+			end
 		endcase
 	end
 end
-
 
 endmodule
