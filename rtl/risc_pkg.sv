@@ -3,4 +3,5 @@ package risc_pkg;
 	typedef enum logic [2:0] {ADD = 3'h0, SUB = 3'h1, AND = 3'h2, OR = 3'h3, XOR = 3'h4} operation_t;
 	typedef enum logic [1:0] {W_ADDR = 2'h0, W_DATA = 2'h1, W_RESP = 2'h2, W_IDLE = 2'h3} write_state_t;
 	typedef enum logic [1:0] {R_ADDR = 2'h0, R_DATA = 2'h1, R_IDLE = 2'h2} read_state_t;
+	typedef enum logic [1:0] {SR_IDLE=2'b00, SR_ADDR=2'b01, SR_DATA=2'b10} axi_state_t;
 endpackage

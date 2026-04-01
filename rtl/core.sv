@@ -1,12 +1,23 @@
 `include "risc_pkg.sv"
 module core #(
-	parameter int XPRLEN = 32
+	parameter int XPRLEN = 32,
+	parameter int ADDR_WIDTH = 32,
+	parameter int DATA_WIDTH = 32
 )(
-	input	logic	clk, resetn,
-	risc_if.cache_modport icache_port,
-	risc_if.cache_modport dcache_port,
-	output	logic done,
-	output	logic [XPRLEN-1:0] count_inst, count_cycle
+	input	logic			clk, resetn,
+	
+	output	logic [ADDR_WIDTH-1:0]	icache_address,
+	input	logic [DATA_WIDTH-1:0]	icache_data,
+	input	logic			icache_stall,
+	output	logic			dcache_memread,
+	output	logic			dcache_memwrite,
+	output	logic [ADDR_WIDTH-1:0]	dcache_address,
+	output	logic [DATA_WIDTH-1:0]	dcache_wdata,
+	input	logic [DATA_WIDTH-1:0]	dcache_rdata,
+	input	logic			dcache_stall,
+
+	output	logic   		done,
+	output	logic [XPRLEN-1:0] 	count_inst, count_cycle
 );
 
 /////////////////////////[IFID]///////////////////////
@@ -77,6 +88,16 @@ logic signed [XPRLEN-1:0] sig_reg_data_in;
 
 logic i_cpu_stall, d_cpu_stall;
 
+assign icache_address	= ifid_pc;
+assign ifid_instr	= icache_data;
+assign i_cpu_stall	= icache_stall;
+assign dcache_memread	= Q_exmem_mem_read;
+assign dcache_memwrite	= Q_exmem_mem_write;
+assign dcache_address	= Q_exmem_alu_result;
+assign dcache_wdata	= Q_exmem_data2;
+assign memwb_mem_data	= dcache_rdata;
+assign d_cpu_stall	= dcache_stall;
+
 always_ff @(posedge clk or negedge resetn) begin
 	if(!resetn) begin
 		count_inst  	<= 0;
@@ -98,24 +119,6 @@ pc_unit inst_pc_unit (
 	.pc_if(ifid_pc)
 );
 
-instruction_cache inst_icache (
-	.clk(icache_port.clk),
-	.ARESETn(icache_port.resetn),
-	.ARVALID(icache_port.ARVALID),
-	.ARREADY(icache_port.ARREADY),
-	.ARADDR(icache_port.ARADDR),
-	.ARLEN(icache_port.ARLEN),
-	.ARSIZE(icache_port.ARSIZE),
-	.ARBURST(icache_port.ARBURST),
-	.RVALID(icache_port.RVALID),
-	.RREADY(icache_port.RREADY),
-	.RDATA(icache_port.RDATA),
-	.RRESP(icache_port.RRESP),
-	.RLAST(icache_port.RLAST),
-	.address(ifid_pc),
-	.instr(ifid_instr),
-	.pipeline_stall(i_cpu_stall)
-);
 
 instr_parser inst_instr_parser (
 	.instruction(Q_ifid_instr),
@@ -242,28 +245,6 @@ alu_control inst_alu_constrol(
 alu inst_alu (
 	.operand_a(sig_alu_in1), .operand_b(sig_alu_in2),
 	.alu_ctrl(sig_alu_ctrl_out), .alu_result(exmem_alu_result)
-);
-
-data_cache inst_dcache (
-	.clk(dcache_port.clk),
-	.ARESETn(dcache_port.resetn),
-	.ARVALID(dcache_port.ARVALID),
-	.ARREADY(dcache_port.ARREADY),
-	.ARADDR(dcache_port.ARADDR),
-	.ARLEN(dcache_port.ARLEN),
-	.ARSIZE(dcache_port.ARSIZE),
-	.ARBURST(dcache_port.ARBURST),
-	.RVALID(dcache_port.RVALID),
-	.RREADY(dcache_port.RREADY),
-	.RDATA(dcache_port.RDATA),
-	.RRESP(dcache_port.RRESP),
-	.RLAST(dcache_port.RLAST),
-	.mem_read(Q_exmem_mem_read),
-	.mem_write(Q_exmem_mem_write),
-	.address(Q_exmem_alu_result),
-	.data_in(Q_exmem_data2),
-	.data_out(memwb_mem_data),
-	.pipeline_stall(d_cpu_stall)
 );
 
 always_comb begin
