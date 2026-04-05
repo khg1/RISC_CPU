@@ -4,7 +4,7 @@ module tb_icache;
     logic [31:0]  	    address;
     logic [31:0]	    data;
     logic                   stall_pipeline;
-
+    logic [7:0]		    error_count;
     axi_if axi_bus ();
 
     instruction_cache DUT (
@@ -41,6 +41,7 @@ module tb_icache;
 	
 	if(data != expected_data) begin
 		$error("[%0t] READ FAILED at 0x%0h: Expected 0x%0h, Got 0x%0h", $time, target_addr, expected_data, data);
+		error_count += 1;
 	end
 	else begin
         	$display("[%0t] CPU SUCCESS: Read Address 0x%0h | Data = 0x%0h\n", $time, target_addr, data);
@@ -59,7 +60,8 @@ module tb_icache;
     end
     
     initial begin
-        resetn  = 0;
+        error_count = 0;
+	resetn  = 0;
         address = 0;
         repeat(3) @(posedge clk);
         resetn <= 1;
@@ -82,8 +84,9 @@ module tb_icache;
 
         $display("Read miss index 0 due to eviction");
         cpu_read(32'h0000_0040, 32'hA1A1_A1A1);
-
-        $display("=== ALL TESTS COMPLETE ===");
+	
+	if(error_count == 0)	$display("@@@PASS");
+	else			$display("@@@FAIL: %0d error count", error_count);
         $finish;
     end
 
