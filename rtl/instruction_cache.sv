@@ -27,7 +27,9 @@ logic [1:0] cache_index, word_offset, byte_offset;
 
 logic	[ADDR_WIDTH-1:0]	missed_address;
 logic	[1:0]			written_word_offset;
+//pragma translate_off
 logic   [RESP_WIDTH-1:0]	read_response;
+//pragma translate_on
 logic				hit;
 
 assign stall_pipeline = ~hit;
@@ -48,9 +50,6 @@ end
 always_ff @(posedge clk or negedge resetn) begin
 	if(!resetn) begin
 		icache_current_state <= I_IDLE;
-		for(int i = 0; i < 4; i++) begin
-			instruction_cache[i].valid <= 0;
-		end
 	end
 	else	icache_current_state <= icache_next_state;
 end
@@ -74,6 +73,9 @@ always_ff @(posedge clk or negedge resetn) begin
 		axi_port.ARSIZE	<= '0;
 		axi_port.ARBURST <= '0;
 		axi_port.RREADY	<= 0;
+		for(int i = 0; i < 4; i++) begin
+			instruction_cache[i].valid <= 0;
+		end
 	end
 	else begin
 		case (icache_current_state)
@@ -87,8 +89,9 @@ always_ff @(posedge clk or negedge resetn) begin
 				if(axi_port.RREADY & axi_port.RVALID) begin
 					instruction_cache[missed_address[5:4]].storage[written_word_offset] <= axi_port.RDATA;
 					written_word_offset <= written_word_offset + 1;
+					//pragma translate_off
 					read_response <= axi_port.RRESP;
-					
+					//pragma translate_on
 					if(axi_port.RLAST) begin
 						instruction_cache[missed_address[5:4]].valid <= 1;
 						instruction_cache[missed_address[5:4]].tag <= missed_address[31:6];

@@ -41,11 +41,13 @@ logic		set_hit_index;
 logic   [ADDR_WIDTH-1:0]	missed_address;
 logic	[DATA_WIDTH-1:0]	missed_data;
 logic   			written_word_offset;
+//pragma translate_off
 logic   [RESP_WIDTH-1:0] 	read_response;
 logic	[RESP_WIDTH-1:0]	write_response;
+logic   [3:0] 			transfer_size;
+//pragma translate_on
 
 logic [7:0] remain_transfer;
-logic [3:0] transfer_size;
 
 dcache_state_t dcache_current_state, dcache_next_state;
 
@@ -70,13 +72,6 @@ end
 always_ff @(posedge clk or negedge resetn) begin
         if(!resetn) begin
                 dcache_current_state      <= D_IDLE;
-		for (int i = 0; i < 4; i++) begin
-                        data_cache[i].lru <= 0;
-                        for (int j = 0; j < 2; j++) begin
-                                data_cache[i].set[j].valid <= 0;
-                                data_cache[i].set[j].dirty <= 0;
-                        end
-                end
         end
         else begin
                 dcache_current_state      <= dcache_next_state;
@@ -84,15 +79,14 @@ always_ff @(posedge clk or negedge resetn) begin
 end
 
 always_comb begin
+	dcache_next_state = D_IDLE;
         case (dcache_current_state)
 		D_IDLE:	begin
 			if(!hit & ~done)	begin
 				if(mem_write)										dcache_next_state = W_REQ;
 				else if(mem_read && data_cache[cache_index].set[data_cache[cache_index].lru].dirty)	dcache_next_state = W_REQ;
 				else if(mem_read && !data_cache[cache_index].set[data_cache[cache_index].lru].dirty)	dcache_next_state = R_REQ;
-				else											dcache_next_state = D_IDLE;
 			end
-			else	dcache_next_state = D_IDLE;
 		end
 		W_REQ:	dcache_next_state = (axi_port.AWVALID && axi_port.AWREADY) ? W_HANDLE:W_REQ;
 		W_HANDLE: dcache_next_state = (axi_port.WLAST && axi_port.WREADY)	? W_RESP:W_HANDLE;
@@ -103,7 +97,7 @@ always_comb begin
 		D_WAIT: dcache_next_state = (!mem_read && !mem_write) ? D_IDLE : D_WAIT;
 		R_REQ: dcache_next_state = (axi_port.ARVALID && axi_port.ARREADY) ? R_HANDLE:R_REQ;
 		R_HANDLE: dcache_next_state = (axi_port.RLAST && axi_port.RREADY)	? D_IDLE:R_HANDLE;
-		default: dcache_next_state = D_IDLE;
+		default: begin end
 	endcase
 end
 
@@ -133,7 +127,13 @@ always_ff @(posedge clk or negedge resetn) begin
 		written_word_offset <= '0;
                 missed_address  <= '0;
 		done <= '0;
-                
+		for (int i = 0; i < 4; i++) begin
+                        data_cache[i].lru <= 0;
+                        for (int j = 0; j < 2; j++) begin
+                                data_cache[i].set[j].valid <= 0;
+                                data_cache[i].set[j].dirty <= 0;
+                        end
+                end 
         end
 	else begin
        		case (dcache_current_state)
@@ -158,7 +158,9 @@ always_ff @(posedge clk or negedge resetn) begin
 						axi_port.WLAST	<= 0;
 					end	
 					remain_transfer <= axi_port.AWLEN;
+					//pragma translate_off
 					transfer_size	<= axi_port.AWSIZE;
+					//pragma translate_on
 				end
 			end
 			W_HANDLE: begin
@@ -181,7 +183,9 @@ always_ff @(posedge clk or negedge resetn) begin
 			W_RESP: begin
 				if(axi_port.BREADY & axi_port.BVALID) begin
 					axi_port.BREADY <= 0;
+					//pragma translate_off
 					write_response <= axi_port.BRESP;
+					//pragma translate_on
 					if(mem_write)	done <= 1;
 					if(mem_read)	begin
 						axi_port.ARVALID <= 1;
@@ -204,7 +208,9 @@ always_ff @(posedge clk or negedge resetn) begin
                                         if(axi_port.ARBURST == 2'h1) begin
                                                 data_cache[missed_address[4:3]].set[data_cache[missed_address[4:3]].lru].storage[written_word_offset] <= axi_port.RDATA;
                                                 written_word_offset <= written_word_offset + 1;
+						//pragma translate_off
                                                 read_response <= axi_port.RRESP;
+						//pragma translate_on
 
                                                 if(axi_port.RLAST) begin
                                                         data_cache[missed_address[4:3]].set[data_cache[missed_address[4:3]].lru].valid <= 1;

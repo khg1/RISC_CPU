@@ -219,6 +219,9 @@ forwarding_unit inst_forwarding_unit(
 
 // MUX for Selecting Input data to ALU based on forwarding condition and instruction type
 always_comb begin
+	sig_alu_in1 = Q_idex_data1;
+	sig_alu_in2 = Q_idex_data2;
+
 	if(Q_idex_alusrc == 2'h2)	     sig_alu_in1 = Q_idex_pc;
 	else if(sig_forward_selA == 2'h0)    sig_alu_in1 = Q_idex_data1;
 	else if(sig_forward_selA == 2'h1)    sig_alu_in1 = Q_exmem_alu_result;
@@ -232,6 +235,7 @@ always_comb begin
 		      end
 	        2'h1: sig_alu_in2 = Q_idex_immediate;
 		2'h2: sig_alu_in2 = 32'h0000_0004;
+		default: begin end
 	endcase
 end
 

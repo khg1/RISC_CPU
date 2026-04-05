@@ -35,7 +35,8 @@ always_ff @(posedge clk or negedge resetn) begin
 end
 
 always_comb begin
-	case(current_state)
+	next_state = current_state;
+	unique case(current_state)
 		IDLE: begin
 			if(icache_req && dcache_req) begin
 				if(last_served == 1'b1)
@@ -69,7 +70,6 @@ always_comb begin
 		        	next_state = IDLE;
 			end
 		
-		default: next_state = IDLE;
     	endcase
 end
 
@@ -105,6 +105,7 @@ always_comb begin
 	mem_axi.WDATA  = '0; 
 	mem_axi.WLAST = 0; 
 	mem_axi.BREADY = 0;
+	mem_axi.WSTRB      = '0;
 
    	case(current_state)
    	    SERVE_ICACHE: begin
