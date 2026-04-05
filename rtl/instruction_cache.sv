@@ -17,7 +17,7 @@ typedef struct packed {
 	logic	[0:3][DATA_WIDTH-1:0]	storage;
 } icache_block_t;
 
-typedef enum logic [1:0] {I_REQ, I_HANDLE, I_IDLE} icache_state_t;
+typedef enum logic [1:0] {I_IDLE = 2'b00, I_REQ = 2'b01, I_HANDLE = 2'b10} icache_state_t;
 
 icache_block_t [0:3] instruction_cache;
 icache_state_t icache_current_state, icache_next_state;
