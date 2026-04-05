@@ -1,4 +1,6 @@
+//pragma translate_off
 `include "risc_pkg.sv"
+//pragma translate_on
 module branch_detect_unit #(
     parameter int XPRLEN = 32
 )(

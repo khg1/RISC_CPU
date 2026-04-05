@@ -1,4 +1,3 @@
-`include "risc_pkg.sv"
 module core #(
 	parameter int XPRLEN = 32,
 	parameter int ADDR_WIDTH = 32,

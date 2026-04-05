@@ -1,4 +1,6 @@
+//pragma translate_off
 `include "risc_pkg.sv"
+//pragma translate_on
 module immediate_gen #(
 	parameter int XPRLEN = 32
 )(

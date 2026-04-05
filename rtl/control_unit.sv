@@ -1,3 +1,6 @@
+//pragma translate_off
+`include "risc_pkg.sv"
+//pragma translate_on
 module control_unit (
 	input logic [6:0]  opcode,
 	output logic 	   branch,

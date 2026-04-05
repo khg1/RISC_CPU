@@ -1,4 +1,6 @@
+//pragma translate_off
 `include "risc_pkg.sv"
+//pragma translate_on
 module instr_parser #(
     parameter int XPRLEN = 32
 )(

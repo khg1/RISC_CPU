@@ -10,11 +10,11 @@ XRUN_FLAGS = -64 -sv -f run.f $(TB_DIR)/$(TB_FILE) -top $(TOP_MODULE) \
 
 run:
 	@echo "Running Target: $(TOP_MODULE)"
-	xrun $(XRUN_FLAGS)
+	xrun -clean $(XRUN_FLAGS)
 
 run_system:
 	@echo "Running Target: $(TOP_MODULE)"
-	xrun $(XRUN_FLAGS) +MEM=$(mem_file) +GOLDREG=$(reg_file)
+	xrun -clean $(XRUN_FLAGS) +MEM=$(mem_file) +GOLDREG=$(reg_file)
 
 tb_top:
 	$(MAKE) run_system TB_FILE=tb_top.sv TOP_MODULE=tb_top mem_file=../tb/mem_fib.hex \

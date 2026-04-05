@@ -1,3 +1,6 @@
+//pragma translate_off
+`include "risc_pkg.sv"
+//pragma translate_on
 module alu #(
 	parameter int XPRLEN = 32
 )(
