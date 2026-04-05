@@ -11,6 +11,8 @@ module tb_dcache;
     logic	 done;
     logic        stall_pipeline;
 
+    logic [7:0]	error_count;
+
     axi_if axi_bus();
     
     data_cache DUT (
@@ -50,7 +52,9 @@ module tb_dcache;
         
         if (data_out != expected_data) begin
             $error("READ FAILED at 0x%0h: Expected 0x%0h, Got 0x%0h", addr, expected_data, data_out);
-        end else begin
+	    error_count += 1;
+        end 
+	else begin
             $display("READ SUCCESS at 0x%0h: Data = 0x%0h", addr, data_out);
         end
         
@@ -75,6 +79,7 @@ module tb_dcache;
 	endtask
 
     initial begin
+	error_count = 0;
         address   = 0;
         data_in   = 0;
         mem_read  = 0;
@@ -148,24 +153,27 @@ module tb_dcache;
         cpu_read(32'h0000_0040, 32'hC000_0000);
 
         $display("Verifying Write-Back Memory Content:");
-        if (main_memory.mem[0] === 32'hDEAD_BEEF) 
-            $display("SUCCESS: evicted dirty data reached memory!");
-        else 
+        if (main_memory.mem[0] === 32'hDEAD_BEEF)	$display("SUCCESS: evicted dirty data reached memory!");
+	else begin
             $error("FAILED: dirty data not in memory. Got 0x%0h", main_memory.mem[0]);
+    	    error_count += 1;
+    	end
 
 	$display("Write miss for set 0 word 0");
         cpu_write(32'h0000_0080, 32'hCAFE_F00D);
 
         $display("Verifying no-write allocate updated main memory directly:");
-        if (main_memory.mem[32'h0000_0080 >> 2] === 32'hCAFE_F00D)
-            $display("SUCCESS: write miss bypassed cache and updated memory");
-        else
+        if (main_memory.mem[32'h0000_0080 >> 2] === 32'hCAFE_F00D)	$display("SUCCESS: write miss bypassed cache and updated memory");
+	else begin
             $error("FAILED: data did not reach main memory! Got 0x%0h", main_memory.mem[32'h0000_0080 >> 2]);
-
+	    error_count += 1;
+	end
         $display("Reading back to ensure data is correct (Should trigger a Read Miss)");
         cpu_read(32'h0000_0080, 32'hCAFE_F00D);
-        $display("@@@PASS");
+
+	if(error_count == 0) $display("@@@PASS");
+	else		     $display("@@@FAIL: %0d error count", error_count);
         $finish;
     end
 
-endmodule
+    endmodule
